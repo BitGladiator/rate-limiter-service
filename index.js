@@ -31,9 +31,36 @@ const rateLimiter = (limit, windowSec) => {
     }
   };
 };
-const slidingwindow = (limit,windowSec)=>{
-  
-}
+const slidingwindow = (limit, windowSec) => {
+  return async (req, res, next) => {
+    try {
+      const ip = req.ip;
+      const now = Math.floor(Date.now() / 1000);
+      const windowStart = Math.floor(now / windowSec) * windowSec;
+
+      const currKey = `rate:${ip}:${windowStart}`;
+      const prevKey = `rate:${ip}:${windowStart - windowSec}`;
+      const currCount = await client.incr(currKey);
+      if (currCount === 1) await client.expire(currKey, windowSec * 2);
+
+      const prevCount = parseInt(await client.get(prevKey)) || 0;
+
+      const elapsed = now - windowStart;
+      const weight = (windowSec - elapsed) / windowSec;
+
+      const total = currCount + prevCount * weight;
+
+      if (total > limit) {
+        return res.status(429).send("Too Many Requests (Sliding Window)");
+      }
+
+      next();
+    } catch {
+      console.error("Limiter error:", err);
+      res.status(500).send("Internal Error");
+    }
+  };
+};
 (async () => {
   try {
     await client.connect();
