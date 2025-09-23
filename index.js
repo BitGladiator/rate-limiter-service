@@ -6,10 +6,19 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.set('trust proxy', true);
+app.use(express.json()); // Parse JSON bodies
 
 const client = redis.createClient();
 client.on("error", (err) => {
   console.log("Redis Error: ", err);
+});
+
+// Request counter middleware
+let totalRequests = 0;
+app.use((req, res, next) => {
+  totalRequests++;
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - IP: ${req.ip}`);
+  next();
 });
 
 const rateLimiter = (limit, windowSec) => {
@@ -90,8 +99,36 @@ const slidingWindowLimiter = (limit, windowSec) => {
       res.json({ data: "Some API data", timestamp: Date.now() });
     });
     
+    
+    app.get("/health", async (req, res) => {
+      try {
+        await client.ping();
+        res.json({ 
+          status: "OK", 
+          redis: "connected",
+          uptime: process.uptime(),
+          memory: process.memoryUsage(),
+          timestamp: new Date().toISOString()
+        });
+      } catch (err) {
+        res.status(503).json({ status: "ERROR", redis: "disconnected" });
+      }
+    });
+    
     app.get("/status", (req, res) => {
       res.json({ status: "OK", server: "running" });
+    });
+  
+    
+    // NEW: Server stats
+    app.get("/stats", (req, res) => {
+      res.json({
+        totalRequests,
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        nodeVersion: process.version,
+        platform: process.platform
+      });
     });
     
     app.get("/reset/:ip", async (req, res) => {
@@ -102,6 +139,24 @@ const slidingWindowLimiter = (limit, windowSec) => {
       } catch (err) {
         res.status(500).send("Error resetting limit");
       }
+    });
+
+    app.post("/echo", (req, res) => {
+      res.json({
+        method: req.method,
+        body: req.body,
+        headers: req.headers,
+        ip: req.ip,
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    app.use("*", (req, res) => {
+      res.status(404).json({ 
+        error: "Not Found", 
+        path: req.path,
+        method: req.method 
+      });
     });
     
     app.listen(PORT, () => {
