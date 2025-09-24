@@ -150,7 +150,24 @@ const slidingWindowLimiter = (limit, windowSec) => {
         timestamp: new Date().toISOString()
       });
     });
-    
+    app.get("/limits/:ip?", async (req, res) => { //get current rate limit status from the ip
+      try {
+        const ip = req.params.ip || req.ip;
+        const key = `rate_limit:${ip}`;
+        const count = await client.get(key);
+        const ttl = await client.ttl(key);
+        
+        res.json({ 
+          ip, 
+          requests: parseInt(count) || 0, 
+          ttl: ttl > 0 ? ttl : null,
+          limit: 5,
+          window: 60
+        });
+      } catch (err) {
+        res.status(500).send("Error getting limits");
+      }
+    });
     app.use("*", (req, res) => {
       res.status(404).json({ 
         error: "Not Found", 
