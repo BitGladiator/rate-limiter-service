@@ -131,7 +131,7 @@ const slidingWindowLimiter = (limit, windowSec) => {
       });
     });
     
-    app.get("/reset/:ip", async (req, res) => {
+    app.get("/reset/:ip", async (req, res) => { //reset the rate limit
       try {
         const ip = req.params.ip;
         const deleted = await client.del(`rate_limit:${ip}`);
@@ -141,7 +141,7 @@ const slidingWindowLimiter = (limit, windowSec) => {
       }
     });
 
-    app.post("/echo", (req, res) => {
+    app.post("/echo", (req, res) => { //display the request
       res.json({
         method: req.method,
         body: req.body,
@@ -168,7 +168,7 @@ const slidingWindowLimiter = (limit, windowSec) => {
         res.status(500).send("Error getting limits");
       }
     });
-    app.use("*", (req, res) => {
+    app.use("*", (req, res) => { //Handling the unknown routes
       res.status(404).json({ 
         error: "Not Found", 
         path: req.path,
@@ -176,7 +176,7 @@ const slidingWindowLimiter = (limit, windowSec) => {
       });
     });
     
-    app.listen(PORT, () => {
+    app.listen(PORT, () => { // Start the server
       console.log(`Server running on port ${PORT}`);
     });
   } catch (err) {
